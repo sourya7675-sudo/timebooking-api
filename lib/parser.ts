@@ -5,17 +5,19 @@ export function parseCommand(command: string) {
   let start: Date
   let end: Date
 
-command = command.toLowerCase().trim()
+  command = command.toLowerCase().trim()
 
   // extract target after "in"
   const targetMatch = command.match(/in\s(.+)$/)
-  const target = targetMatch ? targetMatch[1].trim() : null
 
-  if (!target) {
+  if (!targetMatch) {
     throw new Error("Target (ID or keyword) missing")
   }
 
-  // CASE 1: "10:30 to 3" or "10 to 2"
+  const target = targetMatch[1].trim()
+
+  // CASE 1: time range
+  // supports: "10 to 2", "10:30 to 3", "9:15 to 11:45"
   const rangeMatch = command.match(/(\d{1,2})(?::(\d{2}))?\s*to\s*(\d{1,2})(?::(\d{2}))?/)
 
   if (rangeMatch) {
@@ -27,15 +29,16 @@ command = command.toLowerCase().trim()
     const endMinute = Number(rangeMatch[4] || 0)
 
     start = new Date(now)
-    start.setHours(startHour, startMinute, 0)
+    start.setHours(startHour, startMinute, 0, 0)
 
     end = new Date(now)
-    end.setHours(endHour, endMinute, 0)
+    end.setHours(endHour, endMinute, 0, 0)
 
     return { start, end, target }
   }
 
-  // CASE 2: past X hours/minutes
+  // CASE 2: past time
+  // supports: "past 1 hour", "past 25 minutes"
   const pastMatch = command.match(/past\s(\d+)\s(hour|hours|minute|minutes)/)
 
   if (pastMatch) {
@@ -55,7 +58,8 @@ command = command.toLowerCase().trim()
     return { start, end, target }
   }
 
-  // CASE 3: next X hours/minutes
+  // CASE 3: future time
+  // supports: "next 20 minutes", "next 1 hour"
   const nextMatch = command.match(/next\s(\d+)\s(hour|hours|minute|minutes)/)
 
   if (nextMatch) {
@@ -76,5 +80,4 @@ command = command.toLowerCase().trim()
   }
 
   throw new Error("Unsupported command format")
-
 }
