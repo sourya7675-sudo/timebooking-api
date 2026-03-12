@@ -1,69 +1,59 @@
-import { sql } from "@vercel/postgres";
-import { NextApiRequest, NextApiResponse } from "next";
-import { parseCommand } from "./helpers/parseCommand";
+import supabase from "../../lib/supabase"
+import { parseCommand } from "../../lib/parser"
 
-/**
- * API handler for creating a booking.
- * Accepts POST requests with a command and device name.
- */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+export default async function handler(req,res){
 
-  console.log("Request Body:", req.body);
-  console.log("Environment Variables:", process.env);
+ if(req.method !== "POST"){
+  return res.status(405).send("Only POST allowed")
+ }
 
-  try {
-    const { command, device } = req.body;
+ const { command, device } = req.body
 
-    // Validate request body
-    if (!command || !device) {
-      return res.status(400).json({ error: "Missing command or device in request body" });
-    }
+ const parsed = parseCommand(command)
 
-    console.log("Command:", command);
-    console.log("Device:", device);
+ let bookingId
 
-    // Parse the command to extract booking details
-    const { startTime, endTime, target } = parseCommand(command);
+ if(!isNaN(Number(parsed.target))){
+   bookingId = Number(parsed.target)
+}
+else{
 
-    console.log("Parsed Command:", { startTime, endTime, target });
+ const { data } = await supabase
+ .from("id_mapping")
+ .select("booking_id")
+ .eq("keyword",parsed.target)
+ .single()
 
-    const today = new Date().toISOString().split("T")[0]; // Format as YYYY-MM-DD
+ bookingId = data.booking_id
+}
 
-    let bookingId;
+ const today = new Date()
 
-    if (!isNaN(Number(target))) {
-      bookingId = Number(target);
-      console.log("Booking ID (numeric):", bookingId);
-    } else {
-      const { rows } = await sql`
-        SELECT booking_id FROM id_mapping
-        WHERE keyword = ${target}
-      `;
-      console.log("Database Query Result:", rows);
+ const [h,m] = parsed.start.split(":")
 
-      if (rows.length === 0) {
-        console.error("Target not found in id_mapping");
-        return res.status(404).json({ error: "Target not found in id_mapping" });
-      }
+ const startTime = new Date(today)
+ startTime.setHours(Number(h))
+ startTime.setMinutes(Number(m))
 
-      bookingId = rows[0].booking_id;
-      console.log("Booking ID (from query):", bookingId);
-    }
+ const endTime = new Date(today)
+ endTime.setHours(Number(parsed.end))
+ endTime.setMinutes(0)
 
-    // Insert booking into the database
-    await sql`
-      INSERT INTO bookings
-      (booking_id, device_name, date, start_time, end_time, status)
-      VALUES
-      (${bookingId}, ${device}, ${today}, ${startTime}, ${endTime}, 'READY')
-    `;
+ const { error } = await supabase
+ .from("bookings")
+ .insert({
+   booking_id: bookingId,
+   device_name: device,
+   date: today.toISOString().split("T")[0],
+   start_time: startTime,
+   end_time: endTime,
+   status: "READY"
+ })
 
-    res.status(200).json({ success: true });
-  } catch (error) {
-    console.error("Error in /api/book.ts:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
+ if(error){
+   return res.status(500).json(error)
+ }
+
+ res.json({success:true})
+
 }

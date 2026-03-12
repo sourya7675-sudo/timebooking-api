@@ -1,15 +1,20 @@
 {
-  "dependencies": {
-    "@vercel/postgres": "^0.10.0",
-    "next": "^16.1.6"
-  },
-  "devDependencies": {
-    "@types/next": "^8.0.7",
-    "typescript": "5.9.3"
-  },
+  "name": "timebooking",
+  "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "next": "14.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "typescript": "5.9.3"
   }
 }
