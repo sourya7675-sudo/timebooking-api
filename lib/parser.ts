@@ -8,7 +8,7 @@ export function parseCommand(command: string) {
   command = command.toLowerCase().trim()
 
   // extract target after "in"
-  const targetMatch = command.match(/in\s(.+)$/)
+  const targetMatch = command.match(/id\s(.+)$/)
 
   if (!targetMatch) {
     throw new Error("Target (ID or keyword) missing")
@@ -18,7 +18,7 @@ export function parseCommand(command: string) {
 
   // CASE 1: time range
   // supports: "10 to 2", "10:30 to 3", "9:15 to 11:45"
-  const rangeMatch = command.match(/(\d{1,2})(?::(\d{2}))?\s*to\s*(\d{1,2})(?::(\d{2}))?/)
+  const rangeMatch = command.match(/(\d{1,2})(?::(\d{2}))?\s*and\s*(\d{1,2})(?::(\d{2}))?/)
 
   if (rangeMatch) {
 
