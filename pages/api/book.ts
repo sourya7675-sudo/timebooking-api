@@ -1,59 +1,85 @@
 import supabase from "../../lib/supabase"
 import { parseCommand } from "../../lib/parser"
 
-export default async function handler(req,res){
+export default async function handler(req, res) {
 
- if(req.method !== "POST"){
-  return res.status(405).send("Only POST allowed")
- }
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Only POST allowed" })
+  }
 
- const { command, device } = req.body
+  const { command, device } = req.body
 
- const parsed = parseCommand(command)
+  try {
 
- let bookingId
+    const parsed = parseCommand(command)
 
- if(!isNaN(Number(parsed.target))){
-   bookingId = Number(parsed.target)
-}
-else{
+    let bookingId
 
- const { data } = await supabase
- .from("id_mapping")
- .select("booking_id")
- .eq("keyword",parsed.target)
- .single()
+    // CASE 1: target is numeric ID
+    if (!isNaN(Number(parsed.target))) {
 
- bookingId = data.booking_id
-}
+      bookingId = Number(parsed.target)
 
- const today = new Date()
+      // verify ID exists in database
+      const { data, error } = await supabase
+        .from("id_mapping")
+        .select("booking_id")
+        .eq("booking_id", bookingId)
+        .single()
 
- const [h,m] = parsed.start.split(":")
+      if (error || !data) {
+        return res.status(400).json({ error: "Invalid booking ID" })
+      }
 
- const startTime = new Date(today)
- startTime.setHours(Number(h))
- startTime.setMinutes(Number(m))
+    }
 
- const endTime = new Date(today)
- endTime.setHours(Number(parsed.end))
- endTime.setMinutes(0)
+    // CASE 2: target is keyword
+    else {
 
- const { error } = await supabase
- .from("bookings")
- .insert({
-   booking_id: bookingId,
-   device_name: device,
-   date: today.toISOString().split("T")[0],
-   start_time: startTime,
-   end_time: endTime,
-   status: "READY"
- })
+      const { data, error } = await supabase
+        .from("id_mapping")
+        .select("booking_id")
+        .eq("keyword", parsed.target)
+        .single()
 
- if(error){
-   return res.status(500).json(error)
- }
+      if (error || !data) {
+        return res.status(400).json({ error: "Keyword not found in mapping table" })
+      }
 
- res.json({success:true})
+      bookingId = data.booking_id
+
+    }
+
+    const today = new Date()
+
+    const { error } = await supabase
+      .from("bookings")
+      .insert({
+        booking_id: bookingId,
+        device_name: device,
+        date: today.toISOString().split("T")[0],
+        start_time: parsed.start,
+        end_time: parsed.end,
+        status: "READY"
+      })
+
+    if (error) {
+      return res.status(500).json(error)
+    }
+
+    return res.json({
+      success: true,
+      booking_id: bookingId,
+      start: parsed.start,
+      end: parsed.end
+    })
+
+  } catch (err) {
+
+    return res.status(400).json({
+      error: err.message
+    })
+
+  }
 
 }
