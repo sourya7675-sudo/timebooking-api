@@ -8,7 +8,7 @@ export function parseCommand(command: string) {
   command = command.toLowerCase().trim()
 
   // extract target after "in"
-  const targetMatch = command.match(/id\s(.+)$/)
+  const targetMatch = command.match(/in\s(.+)$/)
 
   if (!targetMatch) {
     throw new Error("Target (ID or keyword) missing")
