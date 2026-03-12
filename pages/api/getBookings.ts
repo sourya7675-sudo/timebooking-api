@@ -8,7 +8,6 @@ export default async function handler(req,res){
  .from("bookings")
  .select("*")
  .eq("status","READY")
- .eq("device_name",device)
 
  res.json(data)
 
