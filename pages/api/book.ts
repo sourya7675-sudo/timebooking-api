@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Only POST allowed" })
   }
 
-     try {
+  try {
 
     const { command, device } = req.body
 
@@ -23,14 +23,11 @@ export default async function handler(req, res) {
 
     // CASE 1 → numeric ID
     if (!isNaN(Number(parsed.target))) {
-
       bookingId = Number(parsed.target)
-
     }
 
     // CASE 2 → keyword mapping
     else {
-
       const { data, error } = await supabase
         .from("id_mapping")
         .select("booking_id")
@@ -46,29 +43,63 @@ export default async function handler(req, res) {
       bookingId = data.booking_id
     }
 
-    const today = new Date()
+    // ✅ USE PARSED DATE
+    const bookingDate = parsed.date
+      ? parsed.date.toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0]
 
-    const { error } = await supabase
+    // ✅ FETCH EXISTING BOOKINGS
+    const { data: existingBookings, error: fetchError } = await supabase
+      .from("bookings")
+      .select("start_time, end_time")
+      .eq("booking_id", bookingId)
+      .eq("date", bookingDate)
+
+    if (fetchError) {
+      return res.status(500).json(fetchError)
+    }
+
+    // ✅ FIND OVERLAPS
+    const conflicts = (existingBookings || []).filter(entry => {
+      const existingStart = new Date(entry.start_time)
+      const existingEnd = new Date(entry.end_time)
+
+      return parsed.start < existingEnd && parsed.end > existingStart
+    })
+
+    // ✅ IF OVERLAP → RETURN LIST
+    if (conflicts.length > 0) {
+      return res.json({
+        status: "overlap",
+        conflicts: conflicts.map(c => ({
+          start: new Date(c.start_time).toTimeString().slice(0,5),
+          end: new Date(c.end_time).toTimeString().slice(0,5)
+        }))
+      })
+    }
+
+    // ✅ INSERT IF NO OVERLAP
+    const { error: insertError } = await supabase
       .from("bookings")
       .insert({
         booking_id: bookingId,
         device_name: device || "unknown",
-        date: today.toISOString().split("T")[0],
+        date: bookingDate,
         start_time: parsed.start,
         end_time: parsed.end,
         status: "READY"
       })
 
-    if (error) {
-      console.error("Insert error:", error)
-      return res.status(500).json(error)
+    if (insertError) {
+      console.error("Insert error:", insertError)
+      return res.status(500).json(insertError)
     }
 
+    // ✅ SUCCESS RESPONSE
     return res.json({
-      success: true,
-      booking_id: bookingId,
-      start_time: parsed.start,
-      end_time: parsed.end
+      status: "success",
+      start: parsed.start.toTimeString().slice(0,5),
+      end: parsed.end.toTimeString().slice(0,5)
     })
 
   } catch (err) {
@@ -76,9 +107,9 @@ export default async function handler(req, res) {
     console.error(err)
 
     return res.status(400).json({
-      error: err.message
+      status: "error",
+      message: err.message
     })
 
   }
-
 }
